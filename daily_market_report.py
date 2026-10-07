@@ -35,7 +35,7 @@ def main():
         7. 對未來的投資看法及建議，若有建議投資的股票請同步列出。
         """
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-3.8-flash',
             contents=prompt,
         )
         report_content = response.text
