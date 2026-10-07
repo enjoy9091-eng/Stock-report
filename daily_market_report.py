@@ -34,33 +34,41 @@ def main():
     7. 對未來的投資看法及建議，若有建議投資的股票請同步列出。
     """
 
-    # 優先嘗試的模型與備援模型列表
-    models_to_try = ['gemini-3.8-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']
+    # 僅使用目前 API 支援的新版有效模型列表
+    models_to_try = ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.5-pro']
     report_content = None
 
     for model_name in models_to_try:
-        print(f"正在嘗試使用模型 {model_name} 生成市場報告...")
-        for attempt in range(3):  # 每個模型最多重試 3 次（因應 503 伺服器忙碌）
+        print(f"正在嘗試使用模型: {model_name}")
+        for attempt in range(1, 4):
             try:
                 response = client.models.generate_content(
                     model=model_name,
                     contents=prompt,
                 )
-                report_content = response.text
-                print(f"🎉 成功使用 {model_name} 生成分析報告！")
-                break
+                if response and response.text:
+                    report_content = response.text
+                    print(f"🎉 成功使用 {model_name} 生成分析報告！")
+                    break
             except Exception as e:
-                print(f"使用 {model_name} 第 {attempt + 1} 次嘗試失敗: {e}")
-                time.sleep(3)  # 等待 3 秒後重試
+                err_msg = str(e)
+                print(f"使用 {model_name} 第 {attempt} 次嘗試失敗: {err_msg}")
+                
+                # 如果是模型不存在 (404)，立刻換下一個模型，不浪費時間重試
+                if "404" in err_msg or "NOT_FOUND" in err_msg:
+                    break
+                
+                # 如果是 503 伺服器忙碌，拉長等待時間再試 (5秒, 10秒)
+                time.sleep(attempt * 5)
         
         if report_content:
             break
 
     if not report_content:
-        print("錯誤：所有模型與重試均失敗，請稍後再試。")
+        print("錯誤：所有模型均無法順利生成報告，請稍後再試。")
         sys.exit(1)
 
-    print(f"準備發送 Email 至 enjoy9091@gmail.com...")
+    print("準備發送 Email 至 enjoy9091@gmail.com...")
     receiver_email = "enjoy9091@gmail.com"
 
     msg = MIMEMultipart()
@@ -70,7 +78,7 @@ def main():
     msg.attach(MIMEText(report_content, "plain", "utf-8"))
 
     try:
-        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+        server = smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30)
         server.login(sender_email, sender_password)
         server.sendmail(sender_email, receiver_email, msg.as_string())
         server.close()
