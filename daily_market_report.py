@@ -34,13 +34,13 @@ def main():
     7. 對未來的投資看法及建議，若有建議投資的股票請同步列出。
     """
 
-    # 僅使用目前 API 支援的新版有效模型列表
-    models_to_try = ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.5-pro']
+    # 精確使用官方推薦的現行有效模型清單
+    models_to_try = ['gemini-3.8-flash', 'gemini-3.1-pro-preview']
     report_content = None
 
     for model_name in models_to_try:
         print(f"正在嘗試使用模型: {model_name}")
-        for attempt in range(1, 4):
+        for attempt in range(1, 5):  # 最多重試 4 次
             try:
                 response = client.models.generate_content(
                     model=model_name,
@@ -54,12 +54,14 @@ def main():
                 err_msg = str(e)
                 print(f"使用 {model_name} 第 {attempt} 次嘗試失敗: {err_msg}")
                 
-                # 如果是模型不存在 (404)，立刻換下一個模型，不浪費時間重試
+                # 若為模型不存在 (404)，直接切換至下一個模型
                 if "404" in err_msg or "NOT_FOUND" in err_msg:
                     break
                 
-                # 如果是 503 伺服器忙碌，拉長等待時間再試 (5秒, 10秒)
-                time.sleep(attempt * 5)
+                # 若遇到 503 高負載，依序等待 5s, 10s, 15s 再重試，避開流量高峰
+                wait_time = attempt * 5
+                print(f"等待 {wait_time} 秒後重試...")
+                time.sleep(wait_time)
         
         if report_content:
             break
