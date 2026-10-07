@@ -3,7 +3,7 @@ import sys
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import google.generativeai as genai
+from google import genai
 
 def main():
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -21,9 +21,8 @@ def main():
 
     print("正在請求 Google Gemini API 生成市場報告...")
     try:
-        # 使用標準 SDK 設定 API Key
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # 使用最新的官方 google-genai SDK
+        client = genai.Client(api_key=api_key)
         
         prompt = """
         你是一位專業的台股與國際市場分析師。請針對最新市場行情，撰寫一份條列式的重點分析報告。
@@ -36,7 +35,10 @@ def main():
         6. 對上述股票的專業投資看法以及建議。
         7. 對未來的投資看法及建議，若有建議投資的股票請同步列出。
         """
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=prompt,
+        )
         report_content = response.text
         print("分析報告生成成功！")
     except Exception as e:
