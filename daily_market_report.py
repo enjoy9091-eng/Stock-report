@@ -21,7 +21,6 @@ def main():
 
     print("正在請求 Google Gemini API 生成市場報告...")
     try:
-        # 使用最新的官方 google-genai SDK
         client = genai.Client(api_key=api_key)
         
         prompt = """
@@ -36,7 +35,7 @@ def main():
         7. 對未來的投資看法及建議，若有建議投資的股票請同步列出。
         """
         response = client.models.generate_content(
-            model='gemini-1.5-flash',
+            model='gemini-2.5-flash',
             contents=prompt,
         )
         report_content = response.text
