@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -19,29 +20,44 @@ def main():
         print("錯誤：未找到 GEMINI_API_KEY，請檢查 GitHub Secrets 設定！")
         sys.exit(1)
 
-    print("正在請求 Google Gemini API 生成市場報告...")
-    try:
-        client = genai.Client(api_key=api_key)
+    client = genai.Client(api_key=api_key)
+    
+    prompt = """
+    你是一位專業的台股與國際市場分析師。請針對最新市場行情，撰寫一份條列式的重點分析報告。
+    報告內容必須嚴格包含以下 7 大項目：
+    1. 目前的國際經濟情勢以及未來趨勢發展的重點摘要。
+    2. 目前股市熱錢在哪些領域的股票中（領域請細化至做項，例如：探針卡、功率元件、CPO、水冷散熱等）。
+    3. 分別列出這些領域的所有股票並標示哪些是指標股票，同時附上這些股票目前的參考股價。
+    4. 分別列出這些股票股價的壓力點以及近期的交易量大低點（支撐點）。
+    5. 列出目前股價處於三角收斂而即將要上升的股票。
+    6. 對上述股票的專業投資看法以及建議。
+    7. 對未來的投資看法及建議，若有建議投資的股票請同步列出。
+    """
+
+    # 優先嘗試的模型與備援模型列表
+    models_to_try = ['gemini-3.8-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']
+    report_content = None
+
+    for model_name in models_to_try:
+        print(f"正在嘗試使用模型 {model_name} 生成市場報告...")
+        for attempt in range(3):  # 每個模型最多重試 3 次（因應 503 伺服器忙碌）
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                )
+                report_content = response.text
+                print(f"🎉 成功使用 {model_name} 生成分析報告！")
+                break
+            except Exception as e:
+                print(f"使用 {model_name} 第 {attempt + 1} 次嘗試失敗: {e}")
+                time.sleep(3)  # 等待 3 秒後重試
         
-        prompt = """
-        你是一位專業的台股與國際市場分析師。請針對最新市場行情，撰寫一份條列式的重點分析報告。
-        報告內容必須嚴格包含以下 7 大項目：
-        1. 目前的國際經濟情勢以及未來趨勢發展的重點摘要。
-        2. 目前股市熱錢在哪些領域的股票中（領域請細化至做項，例如：探針卡、功率元件、CPO、水冷散熱等）。
-        3. 分別列出這些領域的所有股票並標示哪些是指標股票，同時附上這些股票目前的參考股價。
-        4. 分別列出這些股票股價的壓力點以及近期的交易量大低點（支撐點）。
-        5. 列出目前股價處於三角收斂而即將要上升的股票。
-        6. 對上述股票的專業投資看法以及建議。
-        7. 對未來的投資看法及建議，若有建議投資的股票請同步列出。
-        """
-        response = client.models.generate_content(
-            model='gemini-3.8-flash',
-            contents=prompt,
-        )
-        report_content = response.text
-        print("分析報告生成成功！")
-    except Exception as e:
-        print(f"Gemini API 調用失敗: {e}")
+        if report_content:
+            break
+
+    if not report_content:
+        print("錯誤：所有模型與重試均失敗，請稍後再試。")
         sys.exit(1)
 
     print(f"準備發送 Email 至 enjoy9091@gmail.com...")
