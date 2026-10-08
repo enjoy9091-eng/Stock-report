@@ -35,7 +35,6 @@ def main():
 
     client = genai.Client(api_key=api_key)
     
-    # 優化後的精簡高價值提示詞，降低 AI 計算負擔，提昇生成速度
     prompt = """
     你是一位專業的台股與國際市場分析師。請搜尋最新台股與全球股市資訊，撰寫一份簡明扼要的重點分析報告：
 
@@ -46,41 +45,37 @@ def main():
     5. 【專業投資建議】給予投資人的具體操作看法與風險提示。
     """
 
-    # 只使用完全免費且適合高速輸出的 Flash 系列模型
-    models_to_try = ['gemini-2.5-flash', 'gemini-3.8-flash']
+    model_name = 'gemini-3.8-flash'
     report_content = None
 
-    for model_name in models_to_try:
-        print(f"正在嘗試使用模型: {model_name}")
-        for attempt in range(1, 4):
-            print(f"[{model_name}] 第 {attempt} 次嘗試連線...")
-            try:
-                # 單次請求限時 40 秒
-                with ThreadPoolExecutor(max_workers=1) as executor:
-                    future = executor.submit(call_gemini_api, client, model_name, prompt)
-                    response = future.result(timeout=40)
-                
-                if response and response.text:
-                    report_content = response.text
-                    print(f"🎉 成功使用 {model_name} 生成分析報告！")
-                    break
-            except TimeoutError:
-                print(f"⚠️ [{model_name}] 第 {attempt} 次連線超時，準備進行重試...")
-            except Exception as e:
-                err_msg = str(e)
-                print(f"⚠️ [{model_name}] 第 {attempt} 次失敗: {err_msg}")
-                # 遇 429 配額不足或 404，直接切換下一個模型
-                if "429" in err_msg or "404" in err_msg or "NOT_FOUND" in err_msg:
-                    print("檢測到模型配額限制或未找到，切換備用模型...")
-                    break
+    print(f"正在嘗試使用官方推薦模型: {model_name}")
+    for attempt in range(1, 5):  # 最多重試 4 次
+        print(f"[{model_name}] 第 {attempt} 次嘗試連線...")
+        try:
+            # 單次請求限時 40 秒
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(call_gemini_api, client, model_name, prompt)
+                response = future.result(timeout=40)
             
-            time.sleep(attempt * 3)
-        
-        if report_content:
-            break
+            if response and response.text:
+                report_content = response.text
+                print(f"🎉 成功使用 {model_name} 生成分析報告！")
+                break
+        except TimeoutError:
+            print(f"⚠️ [{model_name}] 第 {attempt} 次連線超時，準備重試...")
+        except Exception as e:
+            err_msg = str(e)
+            print(f"⚠️ [{model_name}] 第 {attempt} 次失敗: {err_msg}")
+            
+            # 如果遇到 429 配額不足或 503 伺服器忙碌，適當冷卻等待再試
+            if "429" in err_msg or "503" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
+                wait_time = attempt * 15  # 依序等待 15s, 30s, 45s 等待 API 冷卻恢復配額
+                print(f"檢測到 API 頻率限制 (429/503)，冷卻等待 {wait_time} 秒後重試...")
+                time.sleep(wait_time)
+                continue
 
     if not report_content:
-        print("錯誤：所有 Flash 模型均無法順利生成報告，請稍後再試。")
+        print("錯誤：模型連線超時或每日配額已滿，請稍後再試。")
         sys.exit(1)
 
     print("準備發送 Email 至 enjoy9091@gmail.com...")
