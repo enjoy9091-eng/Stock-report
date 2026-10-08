@@ -8,6 +8,7 @@ on:
 jobs:
   run-report:
     runs-on: ubuntu-latest
+    timeout-minutes: 5    # 強制設定最高執行時間為 5 分鐘，防止無限掛起
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
